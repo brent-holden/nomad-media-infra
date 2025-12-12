@@ -1,0 +1,42 @@
+---
+# Playbook to install HashiCorp Consul on CentOS Stream 10
+- name: Install HashiCorp Consul
+  hosts: nomad
+  become: true
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.dnf:
+        name:
+          - dnf-plugins-core
+        state: present
+
+    - name: Add HashiCorp repository
+      ansible.builtin.yum_repository:
+        name: hashicorp
+        description: HashiCorp Stable - $basearch
+        baseurl: https://rpm.releases.hashicorp.com/RHEL/$releasever/$basearch/stable
+        enabled: true
+        gpgcheck: true
+        gpgkey: https://rpm.releases.hashicorp.com/gpg
+
+    - name: Install Consul
+      ansible.builtin.dnf:
+        name: "consul-{{ consul_version }}"
+        state: present
+
+    - name: Create Consul data directory
+      ansible.builtin.file:
+        path: "{{ consul_data_dir }}"
+        state: directory
+        owner: consul
+        group: consul
+        mode: "0755"
+
+    - name: Create Consul config directory
+      ansible.builtin.file:
+        path: "{{ consul_config_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"

@@ -2,6 +2,12 @@
 # Main playbook to set up complete Nomad media server infrastructure
 # Run with: ansible-playbook -i inventory.ini site.yml
 
+- name: Install Consul
+  ansible.builtin.import_playbook: playbooks/install-consul.yml
+
+- name: Configure Consul
+  ansible.builtin.import_playbook: playbooks/configure-consul.yml
+
 - name: Install Nomad
   ansible.builtin.import_playbook: playbooks/install-nomad.yml
 

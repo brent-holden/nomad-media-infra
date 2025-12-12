@@ -1,0 +1,27 @@
+---
+# Playbook to configure Consul server
+- name: Configure Consul
+  hosts: nomad
+  become: true
+
+  tasks:
+    - name: Deploy Consul server configuration
+      ansible.builtin.template:
+        src: ../templates/consul.hcl.j2
+        dest: "{{ consul_config_dir }}/consul.hcl"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Consul
+
+    - name: Enable and start Consul service
+      ansible.builtin.systemd:
+        name: consul
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart Consul
+      ansible.builtin.systemd:
+        name: consul
+        state: restarted

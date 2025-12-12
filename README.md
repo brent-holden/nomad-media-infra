@@ -13,19 +13,22 @@ The setup uses the SMB CSI driver to mount a network file share containing media
 │   ├── group_vars/
 │   │   └── all.yml
 │   ├── playbooks/
+│   │   ├── configure-consul.yml
 │   │   ├── configure-nomad.yml
+│   │   ├── install-consul.yml
 │   │   ├── install-nomad.yml
 │   │   ├── install-podman-driver.yml
 │   │   └── setup-directories.yml
 │   ├── templates/
 │   │   ├── client.hcl.j2
+│   │   ├── consul.hcl.j2
 │   │   ├── jellyfin-host-volumes.hcl.j2
 │   │   ├── plex-host-volumes.hcl.j2
 │   │   ├── podman.hcl.j2
 │   │   └── server.hcl.j2
 │   ├── inventory.ini
 │   └── site.yml
-├── configuration/          # Example Nomad configuration files
+├── configuration/          # Example Consul and Nomad configuration files
 ├── jobs/
 │   ├── services/           # Media server job definitions
 │   │   ├── jellyfin.nomad
@@ -96,8 +99,10 @@ The `ansible/` directory contains playbooks to automate the complete setup on Ce
 
 | Playbook | Description |
 |----------|-------------|
+| `install-consul.yml` | Installs Consul from HashiCorp's official repository |
+| `configure-consul.yml` | Deploys Consul server configuration |
 | `install-nomad.yml` | Installs Nomad from HashiCorp's official repository |
-| `configure-nomad.yml` | Deploys server and client configuration files |
+| `configure-nomad.yml` | Deploys Nomad server and client configuration files |
 | `install-podman-driver.yml` | Installs Podman and the nomad-driver-podman plugin |
 | `setup-directories.yml` | Creates host volume directories and deploys volume configuration |
 | `site.yml` | Main playbook that runs all of the above in order |
@@ -130,28 +135,37 @@ The `ansible/` directory contains playbooks to automate the complete setup on Ce
 
 ### Required Infrastructure
 - Network access to the SMB/CIFS share
-- Consul (optional, for service discovery)
 
 ### Manual Setup
 
-If not using Ansible, complete the following on each Nomad client:
+If not using Ansible, complete the following on each node:
 
-1. **Install Nomad** from [HashiCorp's repository](https://developer.hashicorp.com/nomad/install)
+1. **Install Consul** from [HashiCorp's repository](https://developer.hashicorp.com/consul/install)
 
-2. **Install Podman** and enable the socket:
+2. **Configure and start Consul**:
+   ```bash
+   sudo cp configuration/consul.hcl /etc/consul.d/
+   sudo mkdir -p /opt/consul/data
+   sudo chown -R consul:consul /opt/consul
+   sudo systemctl enable --now consul
+   ```
+
+3. **Install Nomad** from [HashiCorp's repository](https://developer.hashicorp.com/nomad/install)
+
+4. **Install Podman** and enable the socket:
    ```bash
    sudo dnf install -y podman
    sudo systemctl enable --now podman.socket
    ```
 
-3. **Install nomad-driver-podman** to the plugin directory:
+5. **Install nomad-driver-podman** to the plugin directory:
    ```bash
    sudo mkdir -p /opt/nomad/plugins
    # Download from https://releases.hashicorp.com/nomad-driver-podman/
    sudo unzip nomad-driver-podman_*.zip -d /opt/nomad/plugins/
    ```
 
-4. **Create host volume directories** (for Plex):
+6. **Create host volume directories** (for Plex):
    ```bash
    sudo mkdir -p /opt/plex/config
    sudo mkdir -p /opt/plex/transcode
@@ -162,12 +176,12 @@ If not using Ansible, complete the following on each Nomad client:
    sudo mkdir -p /opt/jellyfin/cache
    ```
 
-5. **Configure Nomad** with the files from `configuration/`:
+7. **Configure Nomad** with the files from `configuration/`:
    - Copy `server.hcl` and `client.hcl` to `/etc/nomad.d/`
    - Copy `podman.hcl` to `/etc/nomad.d/`
    - Copy `plex-host-volumes.hcl` or `jellyfin-host-volumes.hcl` to `/etc/nomad.d/`
 
-6. **Start Nomad**:
+8. **Start Nomad**:
    ```bash
    sudo systemctl enable --now nomad
    ```
