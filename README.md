@@ -15,6 +15,7 @@ The setup uses the SMB CSI driver to mount a network file share containing media
 │   ├── playbooks/
 │   │   ├── configure-consul.yml
 │   │   ├── configure-nomad.yml
+│   │   ├── disable-firewall.yml
 │   │   ├── install-consul.yml
 │   │   ├── install-nomad.yml
 │   │   ├── install-podman-driver.yml
@@ -99,6 +100,7 @@ The `ansible/` directory contains playbooks to automate the complete setup on Ce
 
 | Playbook | Description |
 |----------|-------------|
+| `disable-firewall.yml` | Disables firewalld (RHEL) or ufw (Debian) |
 | `install-consul.yml` | Installs Consul from HashiCorp's official repository |
 | `configure-consul.yml` | Deploys Consul server configuration |
 | `install-nomad.yml` | Installs Nomad from HashiCorp's official repository |

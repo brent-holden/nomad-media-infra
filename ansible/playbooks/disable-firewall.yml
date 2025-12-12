@@ -1,0 +1,30 @@
+---
+# Playbook to disable the firewall on CentOS Stream 10 or Ubuntu 25.10
+- name: Disable Firewall
+  hosts: nomad
+  become: true
+
+  tasks:
+    # CentOS/RHEL tasks
+    - name: Stop and disable firewalld (RHEL)
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: false
+        state: stopped
+      when: ansible_os_family == "RedHat"
+      ignore_errors: true
+
+    # Ubuntu/Debian tasks
+    - name: Disable ufw (Debian)
+      community.general.ufw:
+        state: disabled
+      when: ansible_os_family == "Debian"
+      ignore_errors: true
+
+    - name: Stop and disable ufw service (Debian)
+      ansible.builtin.systemd:
+        name: ufw
+        enabled: false
+        state: stopped
+      when: ansible_os_family == "Debian"
+      ignore_errors: true

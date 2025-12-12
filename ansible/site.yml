@@ -2,6 +2,9 @@
 # Main playbook to set up complete Nomad media server infrastructure
 # Run with: ansible-playbook -i inventory.ini site.yml
 
+- name: Disable Firewall
+  ansible.builtin.import_playbook: playbooks/disable-firewall.yml
+
 - name: Install Consul
   ansible.builtin.import_playbook: playbooks/install-consul.yml
 
