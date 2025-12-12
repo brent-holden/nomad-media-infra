@@ -29,7 +29,6 @@ The setup uses the SMB CSI driver to mount a network file share containing media
 │   │   └── server.hcl.j2
 │   ├── inventory.ini
 │   └── site.yml
-├── configuration/          # Example Consul and Nomad configuration files
 ├── jobs/
 │   ├── services/           # Media server job definitions
 │   │   ├── jellyfin.nomad
@@ -140,15 +139,15 @@ The `ansible/` directory contains playbooks to automate the complete setup on Ce
 
 ### Manual Setup
 
-If not using Ansible, complete the following on each node:
+If not using Ansible, complete the following on each node. Reference the templates in `ansible/templates/` for configuration file examples (substitute variables as needed).
 
 1. **Install Consul** from [HashiCorp's repository](https://developer.hashicorp.com/consul/install)
 
-2. **Configure and start Consul**:
+2. **Configure and start Consul** (see `ansible/templates/consul.hcl.j2`):
    ```bash
-   sudo cp configuration/consul.hcl /etc/consul.d/
    sudo mkdir -p /opt/consul/data
    sudo chown -R consul:consul /opt/consul
+   # Create /etc/consul.d/consul.hcl based on the template
    sudo systemctl enable --now consul
    ```
 
@@ -156,32 +155,34 @@ If not using Ansible, complete the following on each node:
 
 4. **Install Podman** and enable the socket:
    ```bash
-   sudo dnf install -y podman
+   sudo dnf install -y podman   # or: sudo apt install -y podman
    sudo systemctl enable --now podman.socket
    ```
 
-5. **Install nomad-driver-podman** to the plugin directory:
+5. **Install nomad-driver-podman**:
    ```bash
+   sudo dnf install -y nomad-driver-podman   # or: sudo apt install -y nomad-driver-podman
    sudo mkdir -p /opt/nomad/plugins
-   # Download from https://releases.hashicorp.com/nomad-driver-podman/
-   sudo unzip nomad-driver-podman_*.zip -d /opt/nomad/plugins/
+   sudo ln -s /usr/bin/nomad-driver-podman /opt/nomad/plugins/
    ```
 
-6. **Create host volume directories** (for Plex):
+6. **Create plex user and directories** (for Plex):
    ```bash
-   sudo mkdir -p /opt/plex/config
-   sudo mkdir -p /opt/plex/transcode
+   sudo groupadd -g 1001 plex
+   sudo useradd -u 1002 -g plex -s /sbin/nologin -M plex
+   sudo mkdir -p /opt/plex/config /opt/plex/transcode
+   sudo chown -R plex:plex /opt/plex
    ```
    Or for Jellyfin:
    ```bash
-   sudo mkdir -p /opt/jellyfin/config
-   sudo mkdir -p /opt/jellyfin/cache
+   sudo mkdir -p /opt/jellyfin/config /opt/jellyfin/cache
    ```
 
-7. **Configure Nomad** with the files from `configuration/`:
-   - Copy `server.hcl` and `client.hcl` to `/etc/nomad.d/`
-   - Copy `podman.hcl` to `/etc/nomad.d/`
-   - Copy `plex-host-volumes.hcl` or `jellyfin-host-volumes.hcl` to `/etc/nomad.d/`
+7. **Configure Nomad** using templates from `ansible/templates/`:
+   - Create `/etc/nomad.d/server.hcl` based on `server.hcl.j2`
+   - Create `/etc/nomad.d/client.hcl` based on `client.hcl.j2`
+   - Create `/etc/nomad.d/podman.hcl` based on `podman.hcl.j2`
+   - Create `/etc/nomad.d/plex-host-volumes.hcl` or `jellyfin-host-volumes.hcl` based on templates
 
 8. **Start Nomad**:
    ```bash
