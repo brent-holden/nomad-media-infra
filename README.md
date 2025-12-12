@@ -126,38 +126,51 @@ The `ansible/` directory contains playbooks to automate the complete setup on Ce
 
 ## Prerequisites
 
-- HashiCorp Nomad cluster
-- Podman task driver configured on Nomad clients
-- Directories created on Nomad clients for host volumes:
-  ```bash
-  sudo mkdir -p /opt/nomad/volumes/plex-config
-  sudo mkdir -p /opt/nomad/volumes/plex-transcode
-  sudo mkdir -p /opt/nomad/volumes/jellyfin-config
-  sudo mkdir -p /opt/nomad/volumes/jellyfin-cache
-  ```
-- Host volumes configured in Nomad client configuration (`/etc/nomad.d/client.hcl`):
-  ```hcl
-  client {
-    host_volume "plex-config" {
-      path      = "/opt/nomad/volumes/plex-config"
-      read_only = false
-    }
-    host_volume "plex-transcode" {
-      path      = "/opt/nomad/volumes/plex-transcode"
-      read_only = false
-    }
-    host_volume "jellyfin-config" {
-      path      = "/opt/nomad/volumes/jellyfin-config"
-      read_only = false
-    }
-    host_volume "jellyfin-cache" {
-      path      = "/opt/nomad/volumes/jellyfin-cache"
-      read_only = false
-    }
-  }
-  ```
-- Network access to the SMB share
+> **Tip:** Use the [Ansible playbooks](#automated-setup-with-ansible) to automate all of these prerequisites on CentOS Stream 10.
+
+### Required Infrastructure
+- Network access to the SMB/CIFS share
 - Consul (optional, for service discovery)
+
+### Manual Setup
+
+If not using Ansible, complete the following on each Nomad client:
+
+1. **Install Nomad** from [HashiCorp's repository](https://developer.hashicorp.com/nomad/install)
+
+2. **Install Podman** and enable the socket:
+   ```bash
+   sudo dnf install -y podman
+   sudo systemctl enable --now podman.socket
+   ```
+
+3. **Install nomad-driver-podman** to the plugin directory:
+   ```bash
+   sudo mkdir -p /opt/nomad/plugins
+   # Download from https://releases.hashicorp.com/nomad-driver-podman/
+   sudo unzip nomad-driver-podman_*.zip -d /opt/nomad/plugins/
+   ```
+
+4. **Create host volume directories** (for Plex):
+   ```bash
+   sudo mkdir -p /opt/plex/config
+   sudo mkdir -p /opt/plex/transcode
+   ```
+   Or for Jellyfin:
+   ```bash
+   sudo mkdir -p /opt/jellyfin/config
+   sudo mkdir -p /opt/jellyfin/cache
+   ```
+
+5. **Configure Nomad** with the files from `configuration/`:
+   - Copy `server.hcl` and `client.hcl` to `/etc/nomad.d/`
+   - Copy `podman.hcl` to `/etc/nomad.d/`
+   - Copy `plex-host-volumes.hcl` or `jellyfin-host-volumes.hcl` to `/etc/nomad.d/`
+
+6. **Start Nomad**:
+   ```bash
+   sudo systemctl enable --now nomad
+   ```
 
 ## Deployment Order
 
