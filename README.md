@@ -6,9 +6,25 @@ This repository contains HashiCorp Nomad job specifications for running Plex and
 
 The setup uses the SMB CSI driver to mount a network file share containing media files, which is then made available to both Plex and Jellyfin containers. All jobs use Podman as the container runtime.
 
+## Directory Structure
+
+```
+├── configuration/          # Server configuration files (future use)
+├── jobs/
+│   ├── services/           # Media server job definitions
+│   │   ├── jellyfin.nomad
+│   │   └── plex.nomad
+│   └── system/             # CSI plugin and volume definitions
+│       ├── cifs-csi-plugin-controller.nomad
+│       ├── cifs-csi-plugin-node.nomad
+│       └── media-drive-volume.hcl
+└── scripts/                # Utility scripts
+    └── update-plex-version.sh
+```
+
 ## Files
 
-### CSI Plugin Jobs
+### System Jobs (`jobs/system/`)
 
 **`cifs-csi-plugin-controller.nomad`**
 
@@ -17,8 +33,6 @@ Runs the SMB CSI plugin controller as a service job. The controller is responsib
 **`cifs-csi-plugin-node.nomad`**
 
 Runs the SMB CSI plugin node service as a system job (runs on all Nomad clients). The node plugin handles mounting volumes on individual hosts. Runs in privileged mode with host networking to perform mount operations.
-
-### Volume Definition
 
 **`media-drive-volume.hcl`**
 
@@ -30,7 +44,7 @@ Defines the CSI volume that connects to the SMB/CIFS share. Configuration includ
 - Credentials for SMB authentication
 - Source share path
 
-### Media Server Jobs
+### Service Jobs (`jobs/services/`)
 
 **`plex.nomad`**
 
@@ -50,7 +64,7 @@ Runs the Jellyfin Media Server with:
 - Host networking on ports 8096 (HTTP) and 7359 (discovery)
 - Consul service registration with health checks
 
-### Utility Scripts
+### Scripts (`scripts/`)
 
 **`update-plex-version.sh`**
 
@@ -97,17 +111,17 @@ A bash script that:
 
 1. Deploy the CSI plugin controller:
    ```bash
-   nomad job run cifs-csi-plugin-controller.nomad
+   nomad job run jobs/system/cifs-csi-plugin-controller.nomad
    ```
 
 2. Deploy the CSI plugin node service:
    ```bash
-   nomad job run cifs-csi-plugin-node.nomad
+   nomad job run jobs/system/cifs-csi-plugin-node.nomad
    ```
 
 3. Register the CSI volume:
    ```bash
-   nomad volume create media-drive-volume.hcl
+   nomad volume create jobs/system/media-drive-volume.hcl
    ```
 
 4. Set up Plex Nomad variables (if running Plex):
@@ -119,10 +133,10 @@ A bash script that:
 5. Deploy a media server (choose one):
    ```bash
    # For Plex:
-   nomad job run plex.nomad
+   nomad job run jobs/services/plex.nomad
 
    # Or for Jellyfin:
-   nomad job run jellyfin.nomad
+   nomad job run jobs/services/jellyfin.nomad
    ```
 
 ## Notes
