@@ -62,11 +62,34 @@ A bash script that:
 
 - HashiCorp Nomad cluster
 - Podman task driver configured on Nomad clients
-- Host volumes configured on Nomad clients:
-  - `plex-config`
-  - `plex-transcode`
-  - `jellyfin-config`
-  - `jellyfin-cache`
+- Directories created on Nomad clients for host volumes:
+  ```bash
+  sudo mkdir -p /opt/nomad/volumes/plex-config
+  sudo mkdir -p /opt/nomad/volumes/plex-transcode
+  sudo mkdir -p /opt/nomad/volumes/jellyfin-config
+  sudo mkdir -p /opt/nomad/volumes/jellyfin-cache
+  ```
+- Host volumes configured in Nomad client configuration (`/etc/nomad.d/client.hcl`):
+  ```hcl
+  client {
+    host_volume "plex-config" {
+      path      = "/opt/nomad/volumes/plex-config"
+      read_only = false
+    }
+    host_volume "plex-transcode" {
+      path      = "/opt/nomad/volumes/plex-transcode"
+      read_only = false
+    }
+    host_volume "jellyfin-config" {
+      path      = "/opt/nomad/volumes/jellyfin-config"
+      read_only = false
+    }
+    host_volume "jellyfin-cache" {
+      path      = "/opt/nomad/volumes/jellyfin-cache"
+      read_only = false
+    }
+  }
+  ```
 - Network access to the SMB share
 - Consul (optional, for service discovery)
 
