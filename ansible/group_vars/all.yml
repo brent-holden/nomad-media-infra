@@ -21,6 +21,10 @@ plex_transcode_dir: "/opt/plex/transcode"
 jellyfin_config_dir: "/opt/jellyfin/config"
 jellyfin_cache_dir: "/opt/jellyfin/cache"
 
+# Plex user configuration (must match PLEX_UID/PLEX_GID in plex.nomad)
+plex_uid: 1002
+plex_gid: 1001
+
 # Media server selection (plex, jellyfin, or both)
 # Set to the one you want to run
 media_server: "plex"

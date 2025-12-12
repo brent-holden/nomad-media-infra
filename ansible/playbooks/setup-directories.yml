@@ -5,18 +5,40 @@
   become: true
 
   tasks:
+    # Plex user and group setup
+    - name: Create plex group
+      ansible.builtin.group:
+        name: plex
+        gid: "{{ plex_gid }}"
+        state: present
+      when: media_server == "plex" or media_server == "both"
+
+    - name: Create plex user
+      ansible.builtin.user:
+        name: plex
+        uid: "{{ plex_uid }}"
+        group: plex
+        home: "{{ plex_config_dir }}"
+        create_home: false
+        shell: /sbin/nologin
+        system: true
+        state: present
+      when: media_server == "plex" or media_server == "both"
+
+    # Plex directories
     - name: Create Plex directories
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
-        owner: root
-        group: root
+        owner: plex
+        group: plex
         mode: "0755"
       loop:
         - "{{ plex_config_dir }}"
         - "{{ plex_transcode_dir }}"
       when: media_server == "plex" or media_server == "both"
 
+    # Jellyfin directories
     - name: Create Jellyfin directories
       ansible.builtin.file:
         path: "{{ item }}"
