@@ -29,17 +29,16 @@ The setup uses the SMB CSI driver to mount a network file share containing media
 │   │   └── server.hcl.j2
 │   ├── inventory.ini
 │   └── site.yml
-├── jobs/
-│   ├── services/           # Media server job definitions
-│   │   ├── jellyfin.nomad
-│   │   └── plex.nomad
-│   └── system/             # CSI plugin and volume definitions
-│       ├── cifs-csi-plugin-controller.nomad
-│       ├── cifs-csi-plugin-node.nomad
-│       ├── media-drive-volume.hcl
-│       └── update-plex-version.nomad
-└── scripts/                # Utility scripts
-    └── update-plex-version.sh
+└── jobs/
+    ├── periodic/           # Periodic batch jobs
+    │   └── update-plex-version.nomad
+    ├── services/           # Media server job definitions
+    │   ├── jellyfin.nomad
+    │   └── plex.nomad
+    └── system/             # CSI plugin and volume definitions
+        ├── cifs-csi-plugin-controller.nomad
+        ├── cifs-csi-plugin-node.nomad
+        └── media-drive-volume.hcl
 ```
 
 ## Files
@@ -64,13 +63,16 @@ Defines the CSI volume that connects to the SMB/CIFS share. Configuration includ
 - Credentials for SMB authentication
 - Source share path
 
+### Periodic Jobs (`jobs/periodic/`)
+
 **`update-plex-version.nomad`**
 
 A periodic batch job that automatically updates the Plex version:
 - Runs daily at 3am (configurable via cron)
 - Fetches the latest Plex version from the Plex API (PlexPass channel)
+- Dynamically downloads the latest Nomad CLI from HashiCorp
 - Updates the `nomad/jobs/plex` variable while preserving the existing claim token
-- Uses the HashiCorp Nomad container image
+- Uses `debian:bookworm-slim` container image
 
 ### Service Jobs (`jobs/services/`)
 
@@ -91,14 +93,6 @@ Runs the Jellyfin Media Server with:
 - Host volumes for config (`jellyfin-config`) and cache (`jellyfin-cache`)
 - Host networking on ports 8096 (HTTP) and 7359 (discovery)
 - Consul service registration with health checks
-
-### Scripts (`scripts/`)
-
-**`update-plex-version.sh`**
-
-A bash script that:
-1. Fetches the latest Plex version from the Plex API (PlexPass channel)
-2. Updates the Nomad variable `nomad/jobs/plex` with the new version
 
 ## Automated Setup with Ansible
 
@@ -229,6 +223,12 @@ If not using Ansible, complete the following on each node. Reference the templat
    # Or for Jellyfin:
    nomad job run jobs/services/jellyfin.nomad
    ```
+
+6. (Optional) Deploy the Plex version updater (if running Plex):
+   ```bash
+   nomad job run jobs/periodic/update-plex-version.nomad
+   ```
+   This job runs daily at 3am to check for new Plex versions and update the Nomad variable.
 
 ## Notes
 
