@@ -12,23 +12,39 @@ job "update-plex" {
   group "update" {
     count = 1
 
+    # Limit restarts to avoid excessive retries on persistent failures
+    restart {
+      attempts = 2
+      interval = "5m"
+      delay    = "30s"
+      mode     = "fail"
+    }
+
+    # Don't reschedule batch jobs - let them fail and retry next period
+    reschedule {
+      attempts  = 0
+      unlimited = false
+    }
+
     task "fetch-version" {
       driver = "podman"
 
       config {
         image = "docker.io/debian:bookworm-slim"
-        args  = ["/bin/bash", "/local/update-plex-version.sh"]
+        args  = ["/bin/sh", "-c", "sleep 1 && /bin/sh /local/update-plex-version.sh"]
       }
 
       # Script based on scripts/update-plex-version.sh, using nomad CLI
       template {
         data = <<EOF
-#!/bin/bash
+#!/bin/sh
 set -e
+
+echo "Starting Plex version update job..."
 
 # Install required tools
 echo "Installing curl, jq, and unzip..."
-apt-get update -qq && apt-get install -y -qq curl jq unzip > /dev/null
+apt-get update -qq && apt-get install -y -qq curl jq unzip > /dev/null 2>&1
 
 echo "Fetching Plex version from API..."
 PLEX_VERSION=$(curl -s "https://plex.tv/api/downloads/5.json?channel=plexpass" | jq -r '.computer.Linux.version')
