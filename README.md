@@ -12,6 +12,17 @@ The setup deploys:
 - **Host Volumes** - Local directories for application configuration
 - **Media Server** - Plex or Jellyfin via Nomad Pack
 
+## Prerequisites
+
+Before using this repository, you must have a NAS (Network Attached Storage) configured with the following SMB/CIFS shares:
+
+| Share | Purpose |
+|-------|---------|
+| `/media` | Media library storage (movies, TV shows, music) |
+| `/backups` | Backup storage for application configurations |
+
+Configure your NAS credentials and share paths in `ansible/group_vars/all.yml`.
+
 ## Quick Start
 
 1. Configure your settings in `ansible/group_vars/all.yml`
@@ -53,7 +64,7 @@ media_server_enable_update: true
 
 ### CSI Plugin Settings
 ```yaml
-csi_smb_image: "mcr.microsoft.com/k8s/csi/smb-csi:v1.17.0"
+csi_smb_image: "mcr.microsoft.com/k8s/csi/smb-csi:v1.19.1"
 csi_plugin_id: "smb"
 csi_driver_name: "smb.csi.k8s.io"
 csi_log_level: 5
@@ -201,9 +212,9 @@ nomad-pack registry add media github.com/brent-holden/nomad-media-packs
 nomad-pack run plex --registry=media -var gpu_transcoding=true
 ```
 
-## Prerequisites
+## Software Dependencies
 
-The `deploy-media-server.yml` playbook automatically handles prerequisites:
+The `deploy-media-server.yml` playbook automatically handles software dependencies:
 
 | Prerequisite | Handled By |
 |--------------|------------|
