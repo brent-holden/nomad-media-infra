@@ -256,7 +256,7 @@ Both are installed from `hashicorp/tap` (e.g., `hashicorp/tap/nomad`).
 
 - All configuration is managed through `ansible/group_vars/all.yml`
 - Only one media server (Plex or Jellyfin) can be deployed at a time
-- The SMB share is mounted with UID 1002 and GID 1001 to match the Plex user
+- The SMB share is mounted with `user_uid` (1002) and `group_gid` (1001) for container access
 - Backup volume uses `cache=none` and `nobrl` mount options for rsync compatibility
 - GPU transcoding requires `/dev/dri` on the host
 - CLI tools are installed locally; services run on the remote server

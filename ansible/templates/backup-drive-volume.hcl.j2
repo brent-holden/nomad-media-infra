@@ -10,7 +10,7 @@ capability {
 
 mount_options {
   fs_type = "cifs"
-  mount_flags = ["uid={{ plex_uid }}", "gid={{ plex_gid }}", "file_mode=0644", "dir_mode=0755", "vers=3.0", "cache=none", "nobrl"]
+  mount_flags = ["uid={{ user_uid }}", "gid={{ group_gid }}", "file_mode=0644", "dir_mode=0755", "vers=3.0", "cache=none", "nobrl"]
 }
 
 secrets {

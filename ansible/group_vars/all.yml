@@ -24,9 +24,9 @@ plex_transcode_dir: "/opt/plex/transcode"
 jellyfin_config_dir: "/opt/jellyfin/config"
 jellyfin_cache_dir: "/opt/jellyfin/cache"
 
-# Plex user configuration (used for directory ownership and volume permissions)
-plex_uid: 1002
-plex_gid: 1001
+# User configuration (used for directory ownership and volume permissions)
+user_uid: 1002
+group_gid: 1001
 
 # CSI Plugin configuration
 csi_smb_image: "mcr.microsoft.com/k8s/csi/smb-csi:v1.19.1"

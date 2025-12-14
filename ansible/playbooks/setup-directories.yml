@@ -9,14 +9,14 @@
     - name: Create plex group
       ansible.builtin.group:
         name: plex
-        gid: "{{ plex_gid }}"
+        gid: "{{ group_gid }}"
         state: present
       when: media_server == "plex" or media_server == "both"
 
     - name: Create plex user
       ansible.builtin.user:
         name: plex
-        uid: "{{ plex_uid }}"
+        uid: "{{ user_uid }}"
         group: plex
         home: "{{ plex_config_dir }}"
         create_home: false
