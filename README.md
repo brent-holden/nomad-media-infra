@@ -36,7 +36,8 @@ The setup uses the SMB CSI driver to mount a network file share containing media
 │   └── system/             # CSI plugin and volume definitions
 │       ├── cifs-csi-plugin-controller.nomad
 │       ├── cifs-csi-plugin-node.nomad
-│       └── media-drive-volume.hcl
+│       ├── media-drive-volume.hcl
+│       └── update-plex-version.nomad
 └── scripts/                # Utility scripts
     └── update-plex-version.sh
 ```
@@ -62,6 +63,14 @@ Defines the CSI volume that connects to the SMB/CIFS share. Configuration includ
 - Mount options for CIFS including SMB version 3.0
 - Credentials for SMB authentication
 - Source share path
+
+**`update-plex-version.nomad`**
+
+A periodic batch job that automatically updates the Plex version:
+- Runs daily at 3am (configurable via cron)
+- Fetches the latest Plex version from the Plex API (PlexPass channel)
+- Updates the `nomad/jobs/plex` variable while preserving the existing claim token
+- Uses the HashiCorp Nomad container image
 
 ### Service Jobs (`jobs/services/`)
 
