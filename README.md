@@ -1,4 +1,4 @@
-# Nomad CIFS/SMB CSI Infrastructure
+# Nomad CIFS/SMB CSI Infrastructure for Media
 
 This repository contains Ansible playbooks for setting up a CIFS/SMB CSI (Container Storage Interface) plugin on HashiCorp Nomad and deploying media servers (Plex or Jellyfin).
 
