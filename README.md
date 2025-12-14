@@ -33,9 +33,10 @@ fileserver_password: "<YOUR-PASSWORD>"
 
 ### Media Server Selection
 ```yaml
-media_server: "plex"      # Options: "plex", "jellyfin", or "both"
-enable_updates: true      # Deploy update jobs (check for new versions at 3am)
-enable_backups: true      # Deploy backup jobs (backup configs at 2am)
+media_server: "plex"         # Options: "plex", "jellyfin", or "both"
+plex_gpu_transcoding: true   # Enable GPU passthrough (requires /dev/dri on host)
+enable_updates: true         # Deploy update jobs (check for new versions at 3am)
+enable_backups: true         # Deploy backup jobs (backup configs at 2am)
 ```
 
 ### Runtime Overrides
@@ -45,6 +46,9 @@ ansible-playbook -i inventory.ini site.yml -e media_server=jellyfin
 
 # Deploy both media servers
 ansible-playbook -i inventory.ini site.yml -e media_server=both
+
+# Deploy Plex without GPU transcoding (no /dev/dri required)
+ansible-playbook -i inventory.ini site.yml -e plex_gpu_transcoding=false
 
 # Deploy without backup jobs
 ansible-playbook -i inventory.ini site.yml -e enable_backups=false
@@ -73,6 +77,7 @@ ansible-playbook -i inventory.ini site.yml -e enable_backups=false
 │   │   ├── jellyfin-host-volumes.hcl.j2
 │   │   ├── media-drive-volume.hcl.j2
 │   │   ├── plex-host-volumes.hcl.j2
+│   │   ├── plex.nomad.j2
 │   │   ├── podman.hcl.j2
 │   │   └── server.hcl.j2
 │   ├── inventory.ini

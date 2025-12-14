@@ -30,6 +30,9 @@ plex_gid: 1001
 # Override at runtime with: ansible-playbook -i inventory.ini site.yml -e media_server=both
 media_server: "plex"
 
+# Enable GPU passthrough for Plex hardware transcoding (requires /dev/dri on host)
+plex_gpu_transcoding: true
+
 # Deploy update jobs (check for new versions daily at 3am)
 enable_updates: true
 
