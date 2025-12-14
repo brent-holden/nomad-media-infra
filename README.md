@@ -1,4 +1,4 @@
-# Nomad Media Server with CIFS/SMB CSI Plugin
+# Media Services on Nomad using SMB/CIFS CSI Plugin
 
 This repository contains HashiCorp Nomad job specifications for running Plex and Jellyfin media servers with shared media storage via a CIFS/SMB CSI (Container Storage Interface) plugin.
 
