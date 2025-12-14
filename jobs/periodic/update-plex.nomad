@@ -1,5 +1,5 @@
 # This job periodically fetches the latest Plex version and updates the Nomad variable.
-job "update-plex-version" {
+job "update-plex" {
   datacenters = ["dc1"]
   type        = "batch"
 

@@ -31,7 +31,7 @@ The setup uses the SMB CSI driver to mount a network file share containing media
 │   └── site.yml
 └── jobs/
     ├── periodic/           # Periodic batch jobs
-    │   └── update-plex-version.nomad
+    │   └── update-plex.nomad
     ├── services/           # Media server job definitions
     │   ├── jellyfin.nomad
     │   └── plex.nomad
@@ -65,7 +65,7 @@ Defines the CSI volume that connects to the SMB/CIFS share. Configuration includ
 
 ### Periodic Jobs (`jobs/periodic/`)
 
-**`update-plex-version.nomad`**
+**`update-plex.nomad`**
 
 A periodic batch job that automatically updates the Plex version:
 - Runs daily at 3am (configurable via cron)
@@ -226,7 +226,7 @@ If not using Ansible, complete the following on each node. Reference the templat
 
 6. (Optional) Deploy the Plex version updater (if running Plex):
    ```bash
-   nomad job run jobs/periodic/update-plex-version.nomad
+   nomad job run jobs/periodic/update-plex.nomad
    ```
    This job runs daily at 3am to check for new Plex versions and update the Nomad variable.
 
