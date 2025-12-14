@@ -15,6 +15,7 @@ The setup uses the SMB CSI driver to mount a network file share containing media
 │   ├── playbooks/
 │   │   ├── configure-consul.yml
 │   │   ├── configure-nomad.yml
+│   │   ├── deploy-media-jobs.yml
 │   │   ├── disable-firewall.yml
 │   │   ├── install-consul.yml
 │   │   ├── install-nomad.yml
@@ -31,6 +32,7 @@ The setup uses the SMB CSI driver to mount a network file share containing media
 │   └── site.yml
 └── jobs/
     ├── periodic/           # Periodic batch jobs
+    │   ├── update-jellyfin.nomad
     │   └── update-plex.nomad
     ├── services/           # Media server job definitions
     │   ├── jellyfin.nomad
@@ -65,10 +67,19 @@ Defines the CSI volume that connects to the SMB/CIFS share. Configuration includ
 
 ### Periodic Jobs (`jobs/periodic/`)
 
+**`update-jellyfin.nomad`**
+
+A periodic batch job that automatically updates the Jellyfin version:
+- Runs daily at 3am Eastern time
+- Fetches the latest Jellyfin version from the GitHub releases API
+- Dynamically downloads the latest Nomad CLI from HashiCorp
+- Updates the `nomad/jobs/jellyfin` variable with the new version
+- Uses `debian:bookworm-slim` container image
+
 **`update-plex.nomad`**
 
 A periodic batch job that automatically updates the Plex version:
-- Runs daily at 3am (configurable via cron)
+- Runs daily at 3am Eastern time
 - Fetches the latest Plex version from the Plex API (PlexPass channel)
 - Dynamically downloads the latest Nomad CLI from HashiCorp
 - Updates the `nomad/jobs/plex` variable while preserving the existing claim token
@@ -109,6 +120,7 @@ The `ansible/` directory contains playbooks to automate the complete setup on Ce
 | `configure-nomad.yml` | Deploys Nomad server and client configuration files |
 | `install-podman-driver.yml` | Installs Podman and the nomad-driver-podman plugin |
 | `setup-directories.yml` | Creates host volume directories and deploys volume configuration |
+| `deploy-media-jobs.yml` | Deploys media server and update jobs to Nomad |
 | `site.yml` | Main playbook that runs all of the above in order |
 
 ### Usage
@@ -119,13 +131,18 @@ The `ansible/` directory contains playbooks to automate the complete setup on Ce
    vi inventory.ini
    ```
 
-2. Configure variables in `group_vars/all.yml`:
-   - Set `media_server` to `plex`, `jellyfin`, or `both`
-   - Adjust versions and paths as needed
+2. Configure variables in `group_vars/all.yml` or override at runtime.
 
 3. Run the complete setup:
    ```bash
+   # Deploy Plex + update-plex (default)
    ansible-playbook -i inventory.ini site.yml
+
+   # Deploy Jellyfin + update-jellyfin
+   ansible-playbook -i inventory.ini site.yml -e media_server=jellyfin
+
+   # Deploy both media servers and their update jobs
+   ansible-playbook -i inventory.ini site.yml -e media_server=both
    ```
 
    Or run individual playbooks:
@@ -215,20 +232,17 @@ If not using Ansible, complete the following on each node. Reference the templat
    ```
    See [Finding an authentication token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) for how to obtain your claim token.
 
-5. Deploy a media server (choose one):
+5. Deploy a media server and its update job:
    ```bash
    # For Plex:
    nomad job run jobs/services/plex.nomad
+   nomad job run jobs/periodic/update-plex.nomad
 
    # Or for Jellyfin:
    nomad job run jobs/services/jellyfin.nomad
+   nomad job run jobs/periodic/update-jellyfin.nomad
    ```
-
-6. (Optional) Deploy the Plex version updater (if running Plex):
-   ```bash
-   nomad job run jobs/periodic/update-plex.nomad
-   ```
-   This job runs daily at 3am to check for new Plex versions and update the Nomad variable.
+   The update jobs run daily at 3am Eastern time to check for new versions.
 
 ## Notes
 
