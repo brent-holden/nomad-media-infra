@@ -6,6 +6,7 @@ job "update-plex" {
   # Run daily at 3am
   periodic {
     crons            = ["0 3 * * *"]
+    time_zone        = "America/New_York"
     prohibit_overlap = true
   }
 
