@@ -227,8 +227,8 @@ ansible-playbook -i inventory.ini playbooks/deploy-media-server.yml
 Or deploy manually with Nomad Pack:
 
 ```bash
-nomad-pack registry add media github.com/brent-holden/nomad-mediaserver-packs
-nomad-pack run plex --registry=media -var gpu_transcoding=true
+nomad-pack registry add mediaserver github.com/brent-holden/nomad-mediaserver-packs
+nomad-pack run plex --registry=mediaserver -var gpu_transcoding=true
 ```
 
 ## Software Dependencies
