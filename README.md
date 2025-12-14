@@ -201,10 +201,20 @@ nomad-pack registry add media github.com/brent-holden/nomad-media-packs
 nomad-pack run plex --registry=media -var gpu_transcoding=true
 ```
 
+## Prerequisites
+
+The `deploy-media-server.yml` playbook automatically handles prerequisites:
+
+| Prerequisite | Handled By |
+|--------------|------------|
+| Podman | `install-podman-driver.yml` (fails if not installed when run standalone) |
+| Nomad Pack | `deploy-media-server.yml` (auto-installs if missing) |
+| unzip | `deploy-media-server.yml` (auto-installs for Nomad Pack extraction) |
+
 ## Notes
 
 - All configuration is managed through `ansible/group_vars/all.yml`
 - Only one media server (Plex or Jellyfin) can be deployed at a time
 - The SMB share is mounted with UID 1002 and GID 1001 to match the Plex user
 - GPU transcoding requires `/dev/dri` on the host
-- Nomad Pack is required on the Nomad server for media server deployment
+- Nomad Pack is automatically installed on the Nomad server if not present

@@ -10,7 +10,8 @@
 
 - name: Deploy Media Server
   hosts: nomad_servers[0]
-  gather_facts: false
+  gather_facts: true
+  become: true
   tasks:
     - name: Validate media_server value
       ansible.builtin.assert:
@@ -19,12 +20,87 @@
         fail_msg: "media_server must be 'plex' or 'jellyfin'. Got: {{ media_server }}"
         success_msg: "Deploying media server: {{ media_server }}"
 
+    # Check prerequisites
+    - name: Check if Podman is installed
+      ansible.builtin.command:
+        cmd: podman --version
+      register: podman_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fail if Podman is not installed
+      ansible.builtin.fail:
+        msg: "Podman is not installed. Run the full site.yml playbook or install-podman-driver.yml first."
+      when: podman_check.rc != 0
+
+    - name: Check if Nomad Pack is installed
+      ansible.builtin.command:
+        cmd: nomad-pack version
+      register: nomad_pack_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install Nomad Pack if not present
+      when: nomad_pack_check.rc != 0
+      block:
+        - name: Get latest Nomad Pack version
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/hashicorp/nomad-pack/releases/latest
+            return_content: true
+          register: nomad_pack_release
+
+        - name: Set Nomad Pack version
+          ansible.builtin.set_fact:
+            nomad_pack_version: "{{ nomad_pack_release.json.tag_name | regex_replace('^v', '') }}"
+
+        - name: Download Nomad Pack
+          ansible.builtin.get_url:
+            url: "https://releases.hashicorp.com/nomad-pack/{{ nomad_pack_version }}/nomad-pack_{{ nomad_pack_version }}_linux_amd64.zip"
+            dest: /tmp/nomad-pack.zip
+            mode: '0644'
+
+        - name: Install unzip if not present (Debian/Ubuntu)
+          ansible.builtin.apt:
+            name: unzip
+            state: present
+          when: ansible_os_family == "Debian"
+
+        - name: Install unzip if not present (RHEL/CentOS)
+          ansible.builtin.dnf:
+            name: unzip
+            state: present
+          when: ansible_os_family == "RedHat"
+
+        - name: Extract Nomad Pack
+          ansible.builtin.unarchive:
+            src: /tmp/nomad-pack.zip
+            dest: /usr/local/bin/
+            remote_src: true
+            mode: '0755'
+
+        - name: Verify Nomad Pack installation
+          ansible.builtin.command:
+            cmd: nomad-pack version
+          register: nomad_pack_verify
+          changed_when: false
+
+        - name: Display Nomad Pack version
+          ansible.builtin.debug:
+            msg: "Installed Nomad Pack: {{ nomad_pack_verify.stdout }}"
+
+        - name: Clean up download
+          ansible.builtin.file:
+            path: /tmp/nomad-pack.zip
+            state: absent
+
+    # Deploy media server
     - name: Check if Nomad Pack registry exists
       ansible.builtin.command:
         cmd: nomad-pack registry list
       register: registry_list
       changed_when: false
       failed_when: false
+      become: false
 
     - name: Add Nomad Pack registry
       ansible.builtin.command:
@@ -32,6 +108,7 @@
       when: nomad_pack_registry_name not in registry_list.stdout
       register: registry_add
       changed_when: "'added' in registry_add.stdout"
+      become: false
 
     - name: Build nomad-pack variables
       ansible.builtin.set_fact:
@@ -45,6 +122,7 @@
         cmd: nomad-pack run {{ media_server }} --registry={{ nomad_pack_registry_name }} {{ pack_vars }}
       register: pack_result
       changed_when: "'deployed' in pack_result.stdout or 'Plan' in pack_result.stdout"
+      become: false
 
     - name: Display deployment result
       ansible.builtin.debug:
@@ -58,6 +136,7 @@
       retries: 30
       delay: 5
       changed_when: false
+      become: false
 
     - name: Display job status
       ansible.builtin.debug:
