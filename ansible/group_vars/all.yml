@@ -19,6 +19,6 @@ jellyfin_cache_dir: "/opt/jellyfin/cache"
 plex_uid: 1002
 plex_gid: 1001
 
-# Media server selection (plex, jellyfin, or both)
-# Set to the one you want to run
+# Media server selection: "plex", "jellyfin", or "both"
+# Override at runtime with: ansible-playbook -i inventory.ini site.yml -e media_server=both
 media_server: "plex"

@@ -1,6 +1,21 @@
 ---
 # Main playbook to set up complete Nomad media server infrastructure
-# Run with: ansible-playbook -i inventory.ini site.yml
+#
+# Usage:
+#   Deploy Plex (default): ansible-playbook -i inventory.ini site.yml
+#   Deploy Jellyfin:       ansible-playbook -i inventory.ini site.yml -e media_server=jellyfin
+#   Deploy both:           ansible-playbook -i inventory.ini site.yml -e media_server=both
+
+- name: Validate configuration
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Validate media_server value
+      ansible.builtin.assert:
+        that:
+          - media_server in ['plex', 'jellyfin', 'both']
+        fail_msg: "media_server must be 'plex', 'jellyfin', or 'both'. Got: {{ media_server }}"
+        success_msg: "Deploying media server(s): {{ media_server }}"
 
 - name: Disable Firewall
   ansible.builtin.import_playbook: playbooks/disable-firewall.yml
@@ -22,3 +37,6 @@
 
 - name: Setup Host Volume Directories
   ansible.builtin.import_playbook: playbooks/setup-directories.yml
+
+- name: Deploy Media Server Jobs
+  ansible.builtin.import_playbook: playbooks/deploy-media-jobs.yml

@@ -1,0 +1,53 @@
+---
+# Playbook to deploy media server Nomad jobs and their update scripts
+- name: Deploy Media Server Jobs
+  hosts: nomad_servers[0]
+  become: true
+
+  vars:
+    jobs_dir: "{{ playbook_dir }}/../../jobs"
+
+  tasks:
+    # Deploy Plex jobs
+    - name: Deploy Plex service job
+      ansible.builtin.command:
+        cmd: nomad job run {{ jobs_dir }}/services/plex.nomad
+      register: plex_job
+      changed_when: "'Job registration successful' in plex_job.stdout"
+      when: media_server == "plex" or media_server == "both"
+
+    - name: Deploy Plex update job
+      ansible.builtin.command:
+        cmd: nomad job run {{ jobs_dir }}/periodic/update-plex.nomad
+      register: plex_update_job
+      changed_when: "'Job registration successful' in plex_update_job.stdout"
+      when: media_server == "plex" or media_server == "both"
+
+    # Deploy Jellyfin jobs
+    - name: Deploy Jellyfin service job
+      ansible.builtin.command:
+        cmd: nomad job run {{ jobs_dir }}/services/jellyfin.nomad
+      register: jellyfin_job
+      changed_when: "'Job registration successful' in jellyfin_job.stdout"
+      when: media_server == "jellyfin" or media_server == "both"
+
+    - name: Deploy Jellyfin update job
+      ansible.builtin.command:
+        cmd: nomad job run {{ jobs_dir }}/periodic/update-jellyfin.nomad
+      register: jellyfin_update_job
+      changed_when: "'Job registration successful' in jellyfin_update_job.stdout"
+      when: media_server == "jellyfin" or media_server == "both"
+
+    # Display results
+    - name: Show deployed jobs
+      ansible.builtin.debug:
+        msg: |
+          Deployed jobs for media_server={{ media_server }}:
+          {% if media_server == "plex" or media_server == "both" %}
+          - plex (service)
+          - update-plex (periodic)
+          {% endif %}
+          {% if media_server == "jellyfin" or media_server == "both" %}
+          - jellyfin (service)
+          - update-jellyfin (periodic)
+          {% endif %}
