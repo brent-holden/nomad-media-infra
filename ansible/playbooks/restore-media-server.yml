@@ -35,6 +35,15 @@
             ansible-playbook -i inventory.ini playbooks/deploy-media-server.yml -e media_server_enable_restore=true
       when: restore_job_check.rc != 0
 
+    - name: Check if {{ media_server }} is running
+      ansible.builtin.command:
+        cmd: nomad job status {{ media_server }}
+      environment:
+        NOMAD_ADDR: "{{ nomad_addr }}"
+      register: media_server_status
+      changed_when: false
+      failed_when: false
+
     - name: Stop {{ media_server }} service
       ansible.builtin.command:
         cmd: nomad job stop {{ media_server }}
@@ -43,10 +52,12 @@
       register: stop_result
       changed_when: "'complete' in stop_result.stdout"
       failed_when: false
+      when: media_server_status.rc == 0 and 'running' in media_server_status.stdout
 
     - name: Wait for {{ media_server }} to stop
       ansible.builtin.pause:
         seconds: 10
+      when: media_server_status.rc == 0 and 'running' in media_server_status.stdout
 
     - name: Build dispatch command
       ansible.builtin.set_fact:

@@ -192,6 +192,30 @@
       delay: 5
       changed_when: false
 
+    # If restore is enabled, stop the media server and wait for restoration
+    - name: Stop {{ media_server }} for restoration
+      ansible.builtin.command:
+        cmd: nomad job stop {{ media_server }}
+      environment:
+        NOMAD_ADDR: "{{ nomad_addr }}"
+      register: stop_result
+      changed_when: "'complete' in stop_result.stdout or 'cancelled' in stop_result.stdout"
+      failed_when: false
+      when: media_server_enable_restore | default(false) | bool
+
+    - name: Display restore instructions
+      ansible.builtin.debug:
+        msg: |
+          {{ media_server }} has been deployed but is STOPPED, waiting for restoration.
+
+          To restore from backup, run:
+            ansible-playbook -i inventory.ini playbooks/restore-media-server.yml
+
+          Or to restore from a specific date:
+            ansible-playbook -i inventory.ini playbooks/restore-media-server.yml -e backup_date=YYYY-MM-DD
+      when: media_server_enable_restore | default(false) | bool
+
     - name: Display job status
       ansible.builtin.debug:
         msg: "{{ media_server }} is now running. Access at http://192.168.0.10:{{ '32400' if media_server == 'plex' else '8096' }}"
+      when: not (media_server_enable_restore | default(false) | bool)
