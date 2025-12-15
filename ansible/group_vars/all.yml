@@ -50,4 +50,3 @@ nomad_pack_registry_url: "github.com/brent-holden/nomad-mediaserver-packs"
 media_server_gpu_transcoding: true
 media_server_enable_backup: true
 media_server_enable_update: true
-media_server_enable_restore: true

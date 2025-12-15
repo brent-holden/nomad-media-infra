@@ -1,0 +1,24 @@
+---
+# Restore *arr stack configuration from backup
+#
+# This is a convenience wrapper around deploy-arr-stack.yml with restore_from_backup=true.
+# The restore workflow:
+#   1. Creates temporary restore jobs
+#   2. Dispatches restore from backup for each service
+#   3. Removes restore jobs
+#   4. Starts all services with restored configuration
+#
+# Usage:
+#   Restore all *arr services from latest backup:
+#     ansible-playbook -i inventory.ini playbooks/restore-arr-stack.yml
+#
+#   Restore specific services:
+#     ansible-playbook -i inventory.ini playbooks/restore-arr-stack.yml -e "arr_services=['radarr','sonarr']"
+#
+#   Restore from specific date:
+#     ansible-playbook -i inventory.ini playbooks/restore-arr-stack.yml -e backup_date=2025-01-15
+
+- name: Restore *arr Stack from Backup
+  ansible.builtin.import_playbook: deploy-arr-stack.yml
+  vars:
+    restore_from_backup: true

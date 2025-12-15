@@ -19,6 +19,15 @@
 #
 #   Without backups:
 #     ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e arr_enable_backup=false
+#
+#   Restore from backup:
+#     ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e restore_from_backup=true
+#
+#   Restore specific services from backup:
+#     ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e "arr_services=['radarr']" -e restore_from_backup=true
+#
+#   Restore from specific date:
+#     ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e restore_from_backup=true -e backup_date=2025-01-15
 
 - name: Deploy *arr Stack
   hosts: controller
@@ -36,6 +45,8 @@
     # Pack variables
     arr_enable_backup: true
     arr_enable_update: true
+    # Restore from backup (default: false)
+    restore_from_backup: false
   tasks:
     - name: Validate arr_services
       ansible.builtin.assert:
@@ -116,14 +127,119 @@
       loop_control:
         label: "{{ item.item }}"
 
-    # Build pack variables
+    #
+    # RESTORE FROM BACKUP WORKFLOW
+    # If restore_from_backup=true, we:
+    #   1. Deploy with enable_restore=true (creates restore job)
+    #   2. Dispatch the restore job for each service
+    #   3. Wait for completion
+    #   4. Redeploy with enable_restore=false (removes restore job, starts service)
+    #
+    - name: Restore from backup workflow
+      when: restore_from_backup | bool
+      block:
+        - name: Display restore workflow start
+          ansible.builtin.debug:
+            msg: "Starting restore workflow for {{ arr_services | join(', ') }}..."
+
+        - name: Deploy restore jobs for all services
+          ansible.builtin.command:
+            cmd: >-
+              nomad-pack run --registry={{ nomad_pack_registry_name }}
+              --var enable_backup=false
+              --var enable_update=false
+              --var enable_restore=true
+              {{ item }}
+          environment:
+            NOMAD_ADDR: "{{ nomad_addr }}"
+          loop: "{{ arr_services }}"
+          register: restore_deploys
+          changed_when: "'deployed' in restore_deploys.stdout or 'Plan' in restore_deploys.stdout"
+
+        - name: Wait for restore jobs to be registered
+          ansible.builtin.pause:
+            seconds: 5
+
+        - name: Dispatch restore jobs
+          ansible.builtin.command:
+            cmd: >-
+              nomad job dispatch
+              {{ '-meta backup_date=' + backup_date if backup_date is defined else '' }}
+              {{ item }}-restore
+          environment:
+            NOMAD_ADDR: "{{ nomad_addr }}"
+          loop: "{{ arr_services }}"
+          register: dispatch_results
+          changed_when: true
+
+        - name: Extract dispatch job IDs
+          ansible.builtin.set_fact:
+            dispatch_jobs: "{{ dispatch_jobs | default([]) + [{'service': item.item, 'job_id': item.stdout | regex_search('Dispatched Job ID = (.+)', '\\1') | first}] }}"
+          loop: "{{ dispatch_results.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+
+        - name: Display dispatched restore jobs
+          ansible.builtin.debug:
+            msg: "{{ item.service }}-restore dispatched: {{ item.job_id }}"
+          loop: "{{ dispatch_jobs }}"
+          loop_control:
+            label: "{{ item.service }}"
+
+        - name: Wait for all restore jobs to complete
+          ansible.builtin.command:
+            cmd: nomad job status {{ item.job_id }}
+          environment:
+            NOMAD_ADDR: "{{ nomad_addr }}"
+          loop: "{{ dispatch_jobs }}"
+          loop_control:
+            label: "{{ item.service }}"
+          register: job_statuses
+          until: "'dead' in job_statuses.stdout or 'complete' in job_statuses.stdout"
+          retries: 60
+          delay: 5
+          changed_when: false
+
+        - name: Get restore job logs
+          ansible.builtin.command:
+            cmd: nomad alloc logs -job {{ item.job_id }}
+          environment:
+            NOMAD_ADDR: "{{ nomad_addr }}"
+          loop: "{{ dispatch_jobs }}"
+          loop_control:
+            label: "{{ item.service }}"
+          register: restore_logs
+          changed_when: false
+
+        - name: Display restore results
+          ansible.builtin.debug:
+            msg: |
+              {{ item.item.service }} restore:
+              {{ 'SUCCESS' if 'Restore complete!' in item.stdout else 'FAILED - check logs' }}
+          loop: "{{ restore_logs.results }}"
+          loop_control:
+            label: "{{ item.item.service }}"
+
+        - name: Check for any failed restores
+          ansible.builtin.fail:
+            msg: "One or more restore jobs failed. Check logs above."
+          when: restore_logs.results | selectattr('stdout', 'not search', 'Restore complete!') | list | length > 0
+
+        - name: Display restore success
+          ansible.builtin.debug:
+            msg: "All restores completed successfully. Now deploying services..."
+
+    #
+    # NORMAL DEPLOYMENT
+    # Deploy all services (with restore jobs removed if they were created)
+    #
     - name: Set pack variables
       ansible.builtin.set_fact:
         pack_vars: >-
           --var enable_backup={{ arr_enable_backup | lower }}
           --var enable_update={{ arr_enable_update | lower }}
+          --var enable_restore=false
 
-    # Deploy each service
     - name: Deploy *arr services with Nomad Pack
       ansible.builtin.command:
         cmd: nomad-pack run --registry={{ nomad_pack_registry_name }} {{ pack_vars }} {{ item }}
@@ -157,6 +273,9 @@
       ansible.builtin.debug:
         msg: |
           *arr stack deployed successfully!
+          {% if restore_from_backup | bool %}
+          Configuration was restored from backup{{ ' (' + backup_date + ')' if backup_date is defined else ' (latest)' }}.
+          {% endif %}
 
           Service URLs:
           {% if 'radarr' in arr_services %}

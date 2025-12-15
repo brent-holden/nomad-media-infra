@@ -99,9 +99,10 @@ Configure your NAS with SMB/CIFS shares:
 | Playbook | Description |
 |----------|-------------|
 | `site.yml` | Main playbook - deploys complete infrastructure and media server |
-| `deploy-media-server.yml` | Deploy/redeploy Plex or Jellyfin only |
-| `deploy-arr-stack.yml` | Deploy *arr services (Radarr, Sonarr, etc.) |
-| `restore-media-server.yml` | Restore media server configuration from backup |
+| `deploy-media-server.yml` | Deploy/redeploy Plex or Jellyfin (with optional restore) |
+| `deploy-arr-stack.yml` | Deploy *arr services (with optional restore) |
+| `restore-media-server.yml` | Convenience wrapper for deploy with restore |
+| `restore-arr-stack.yml` | Convenience wrapper for arr stack with restore |
 | `deploy-csi-plugins.yml` | Deploy CSI controller and node plugins |
 | `deploy-csi-volumes.yml` | Register CSI volumes |
 | `setup-users.yml` | Create users/groups for media server |
@@ -146,23 +147,33 @@ ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml \
 
 ### Restoring from Backup
 
-The restore playbook handles the complete restore workflow automatically:
+Restore is integrated into the deployment playbooks. When you deploy with `restore_from_backup=true`, the workflow:
+1. Creates a temporary restore job
+2. Dispatches restore from backup
+3. Removes the restore job
+4. Starts the service with restored configuration
 
 ```bash
-# Restore from latest backup
-ansible-playbook -i inventory.ini playbooks/restore-media-server.yml
+# Deploy and restore media server from latest backup
+ansible-playbook -i inventory.ini playbooks/deploy-media-server.yml -e restore_from_backup=true
 
-# Restore from a specific date
+# Deploy and restore from a specific date
+ansible-playbook -i inventory.ini playbooks/deploy-media-server.yml -e restore_from_backup=true -e backup_date=2025-01-15
+
+# Or use the convenience wrapper
+ansible-playbook -i inventory.ini playbooks/restore-media-server.yml
 ansible-playbook -i inventory.ini playbooks/restore-media-server.yml -e backup_date=2025-01-15
+
+# Restore *arr stack from backup
+ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e restore_from_backup=true
+ansible-playbook -i inventory.ini playbooks/restore-arr-stack.yml  # convenience wrapper
+
+# Restore specific *arr services
+ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml \
+  -e "arr_services=['radarr','sonarr']" -e restore_from_backup=true
 ```
 
-The restore playbook:
-1. Stops the media server
-2. Dispatches the restore job
-3. Waits for restore to complete
-4. Restarts the media server
-
-**Note:** The `plex-restore` or `jellyfin-restore` job must be deployed first. Set `media_server_enable_restore=true` (enabled by default).
+**Note:** Restore jobs are ephemeral - they are created only during the restore workflow and removed after completion. No persistent restore jobs remain on the cluster.
 
 ## Configuration
 
@@ -188,7 +199,6 @@ media_server: "plex"
 media_server_gpu_transcoding: true    # Enable GPU transcoding
 media_server_enable_backup: true      # Enable periodic backup job
 media_server_enable_update: true      # Enable periodic update job
-media_server_enable_restore: true     # Enable restore job (for manual dispatch)
 ```
 
 ### User/Group Settings
@@ -269,7 +279,8 @@ When jobs request host volumes, Nomad creates them on-demand with the specified 
 | `plex` or `jellyfin` | service | Media server |
 | `plex-backup` or `jellyfin-backup` | batch/periodic | Daily backup at 2am |
 | `plex-update` or `jellyfin-update` | batch/periodic | Daily version check at 3am |
-| `plex-restore` or `jellyfin-restore` | batch/parameterized | Manual restore job |
+
+**Note:** Restore jobs (`plex-restore`, `jellyfin-restore`, etc.) are ephemeral - created during restore workflow and removed after completion.
 
 ### *arr Stack Jobs
 
@@ -284,6 +295,8 @@ Each *arr service creates multiple jobs:
 | Overseerr | `overseerr` | `overseerr-backup` | `overseerr-update` |
 | Tautulli | `tautulli` | `tautulli-backup` | `tautulli-update` |
 | SABnzbd | `sabnzbd` | `sabnzbd-backup` | `sabnzbd-update` |
+
+Restore jobs (`radarr-restore`, `sonarr-restore`, etc.) are created during the restore workflow and removed after completion.
 
 ## *arr Stack Setup
 
