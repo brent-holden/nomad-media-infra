@@ -1,11 +1,12 @@
 ---
-# Playbook to create host volume directories for media servers
-- name: Setup Host Volume Directories
+# Playbook to create users/groups for media servers
+# Note: Directories are created by Nomad dynamic host volumes (mkdir plugin)
+- name: Setup Media Server Users
   hosts: nomad_clients
   become: true
 
   tasks:
-    # Plex user and group setup
+    # Plex user and group setup (required for volume ownership)
     - name: Create plex group
       ansible.builtin.group:
         name: plex
@@ -25,54 +26,21 @@
         state: present
       when: media_server == "plex" or media_server == "both"
 
-    # Plex directories
-    - name: Create Plex directories
+    # Create parent directories for dynamic host volumes
+    - name: Create /opt/plex parent directory
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: /opt/plex
         state: directory
         owner: plex
         group: plex
         mode: "0755"
-      loop:
-        - "{{ plex_config_dir }}"
-        - "{{ plex_transcode_dir }}"
       when: media_server == "plex" or media_server == "both"
 
-    # Jellyfin directories
-    - name: Create Jellyfin directories
+    - name: Create /opt/jellyfin parent directory
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: /opt/jellyfin
         state: directory
         owner: root
         group: root
         mode: "0755"
-      loop:
-        - "{{ jellyfin_config_dir }}"
-        - "{{ jellyfin_cache_dir }}"
       when: media_server == "jellyfin" or media_server == "both"
-
-    - name: Deploy Plex host volume configuration
-      ansible.builtin.template:
-        src: ../templates/plex-host-volumes.hcl.j2
-        dest: "{{ nomad_config_dir }}/plex-host-volumes.hcl"
-        owner: root
-        group: root
-        mode: "0644"
-      when: media_server == "plex" or media_server == "both"
-      notify: Restart Nomad
-
-    - name: Deploy Jellyfin host volume configuration
-      ansible.builtin.template:
-        src: ../templates/jellyfin-host-volumes.hcl.j2
-        dest: "{{ nomad_config_dir }}/jellyfin-host-volumes.hcl"
-        owner: root
-        group: root
-        mode: "0644"
-      when: media_server == "jellyfin" or media_server == "both"
-      notify: Restart Nomad
-
-  handlers:
-    - name: Restart Nomad
-      ansible.builtin.systemd:
-        name: nomad
-        state: restarted

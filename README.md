@@ -9,7 +9,7 @@ The setup deploys:
 - **Nomad** - Container orchestration with Podman driver
 - **CIFS CSI Plugin** - Controller and node plugins for mounting SMB/CIFS network shares
 - **CSI Volumes** - Pre-configured volumes for media and backup storage
-- **Host Volumes** - Local directories for application configuration
+- **Dynamic Host Volumes** - Nomad-managed local storage for application configuration (requires Nomad 1.10+)
 - **Media Server** - Plex or Jellyfin via Nomad Pack
 
 ## Architecture
@@ -93,8 +93,9 @@ csi_node_cpu: 512
 csi_node_memory: 512
 ```
 
-### Host Volume Directories
+### Dynamic Host Volume Paths
 ```yaml
+# Paths for dynamic host volumes (created by mkdir plugin)
 plex_config_dir: "/opt/plex/config"
 plex_transcode_dir: "/opt/plex/transcode"
 jellyfin_config_dir: "/opt/jellyfin/config"
@@ -130,6 +131,7 @@ ansible/
 │   ├── configure-nomad.yml
 │   ├── deploy-csi-plugins.yml   # Deploys CSI controller and node plugins
 │   ├── deploy-csi-volumes.yml   # Registers CSI volumes
+│   ├── deploy-host-volumes.yml  # Creates dynamic host volumes
 │   ├── deploy-media-server.yml  # Deploys media server via Nomad Pack
 │   ├── disable-firewall.yml
 │   ├── install-consul.yml
@@ -142,7 +144,11 @@ ansible/
 │   ├── cifs-csi-plugin-node.nomad.j2
 │   ├── client.hcl.j2
 │   ├── consul.hcl.j2
+│   ├── jellyfin-cache-volume.hcl.j2
+│   ├── jellyfin-config-volume.hcl.j2
 │   ├── media-drive-volume.hcl.j2
+│   ├── plex-config-volume.hcl.j2
+│   ├── plex-transcode-volume.hcl.j2
 │   ├── podman.hcl.j2
 │   └── server.hcl.j2
 ├── inventory.ini
@@ -160,9 +166,10 @@ ansible/
 | `install-nomad.yml` | Installs Nomad from HashiCorp repository (Linux) or Homebrew (macOS) |
 | `configure-nomad.yml` | Deploys Nomad server and client configuration |
 | `install-podman-driver.yml` | Installs Podman and nomad-driver-podman |
-| `setup-directories.yml` | Creates host volume directories |
+| `setup-directories.yml` | Creates users and parent directories for host volumes |
 | `deploy-csi-plugins.yml` | Deploys CSI controller and node plugins |
 | `deploy-csi-volumes.yml` | Registers CSI volumes for media and backups |
+| `deploy-host-volumes.yml` | Creates dynamic host volumes for local storage |
 | `deploy-media-server.yml` | Deploys Plex or Jellyfin via Nomad Pack (auto-installs via Homebrew on macOS) |
 
 ## CSI Plugins
@@ -181,7 +188,9 @@ The playbooks deploy two CSI plugin jobs:
 | `media-drive` | Shared media library (movies, TV shows, music) |
 | `backup-drive` | Backup storage for application configurations |
 
-## Host Volumes
+## Dynamic Host Volumes
+
+These volumes are created using Nomad's dynamic host volume feature (requires Nomad 1.10+). The `mkdir` plugin automatically creates directories with the correct ownership and permissions.
 
 | Volume | Path | Purpose |
 |--------|------|---------|
@@ -189,6 +198,8 @@ The playbooks deploy two CSI plugin jobs:
 | `plex-transcode` | `/opt/plex/transcode` | Temporary transcoding files |
 | `jellyfin-config` | `/opt/jellyfin/config` | Jellyfin configuration and database |
 | `jellyfin-cache` | `/opt/jellyfin/cache` | Jellyfin cache storage |
+
+Volumes are created by `deploy-host-volumes.yml` using `nomad volume create`. See [Nomad Dynamic Host Volumes](https://developer.hashicorp.com/nomad/docs/stateful-workloads/dynamic-host-volumes) for more information.
 
 ## Media Server Features
 
@@ -246,11 +257,11 @@ Both are installed from `hashicorp/tap` (e.g., `hashicorp/tap/nomad`).
 
 ### Target Server (Linux)
 
-| Prerequisite | Installed By |
-|--------------|--------------|
-| Consul | `install-consul.yml` |
-| Nomad | `install-nomad.yml` |
-| Podman | `install-podman-driver.yml` |
+| Prerequisite | Installed By | Notes |
+|--------------|--------------|-------|
+| Consul | `install-consul.yml` | |
+| Nomad 1.10+ | `install-nomad.yml` | Required for dynamic host volumes |
+| Podman | `install-podman-driver.yml` | |
 
 ## Notes
 
