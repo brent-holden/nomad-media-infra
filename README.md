@@ -172,12 +172,14 @@ nomad_plugin_dir: "/opt/nomad/plugins"
 
 ```yaml
 # CSI plugin configuration
-csi_smb_image: "mcr.microsoft.com/k8s/csi/smb-csi:v1.8.0"  # Microsoft's SMB CSI driver image
-csi_plugin_id: "cifs"                                       # Plugin ID used in Nomad (volumes reference this)
-csi_driver_name: "smb.csi.k8s.io"                           # Driver name (from upstream)
+csi_smb_image: "registry.k8s.io/sig-storage/smbplugin:v1.19.1"  # Kubernetes SIG Storage SMB CSI driver
+csi_plugin_id: "cifs"                                            # Plugin ID used in Nomad (volumes reference this)
+csi_driver_name: "smb.csi.k8s.io"                                # Driver name (from upstream)
 ```
 
-**Note:** The plugin ID is `cifs` for clarity, while the underlying driver uses Microsoft's `smb.csi.k8s.io` implementation. Volumes reference the plugin by `csi_plugin_id` (i.e., `plugin_id = "cifs"`).
+**Note:** The plugin ID is `cifs` for clarity, while the underlying driver uses the `smb.csi.k8s.io` implementation. Volumes reference the plugin by `csi_plugin_id` (i.e., `plugin_id = "cifs"`).
+
+For standalone CSI plugin deployment without Ansible, see [nomad-csi-cifs](https://github.com/brent-holden/nomad-csi-cifs).
 
 ## Storage Architecture
 
@@ -339,3 +341,4 @@ This creates volumes and deploys the media server without the full Ansible infra
 ## Related Repositories
 
 - [nomad-mediaserver-packs](https://github.com/brent-holden/nomad-mediaserver-packs) - Nomad Pack templates for Plex and Jellyfin (includes standalone `setup.sh` script)
+- [nomad-csi-cifs](https://github.com/brent-holden/nomad-csi-cifs) - Standalone CSI CIFS/SMB plugin deployment for Nomad
