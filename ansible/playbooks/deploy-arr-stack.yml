@@ -6,9 +6,12 @@
 #   - Sonarr (TV series management)
 #   - Lidarr (music management)
 #   - Prowlarr (indexer management)
-#   - Overseerr (request management)
+#   - Seerr (request management) - default
+#   - Overseerr (request management) - alternative to Seerr
 #   - Tautulli (Plex monitoring)
 #   - SABnzbd (Usenet download client)
+#   - seerr-reverse-proxy (HTTPS proxy for Seerr) - optional
+#   - overseerr-reverse-proxy (HTTPS proxy for Overseerr) - optional
 #
 # Usage:
 #   Deploy all services:
@@ -16,6 +19,12 @@
 #
 #   Deploy specific services:
 #     ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e "arr_services=['radarr','sonarr','sabnzbd']"
+#
+#   Use Overseerr instead of Seerr:
+#     ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e "arr_services=['radarr','sonarr','lidarr','prowlarr','overseerr','tautulli','sabnzbd']"
+#
+#   Deploy with HTTPS reverse proxy (requires proxy_dns_name):
+#     ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e "arr_services=['radarr','sonarr','lidarr','prowlarr','seerr','seerr-reverse-proxy','tautulli','sabnzbd']" -e proxy_dns_name=requests.example.com
 #
 #   Without backups:
 #     ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml -e arr_enable_backup=false
@@ -33,15 +42,32 @@
   hosts: controller
   gather_facts: true
   vars:
-    # Default list of services to deploy
+    # Default list of services to deploy (seerr is default, use overseerr as alternative)
+    # Reverse proxies are optional and require proxy_dns_name to be set
     arr_services:
       - radarr
       - sonarr
       - lidarr
       - prowlarr
+      - seerr
+      - tautulli
+      - sabnzbd
+    # Valid service names
+    valid_services:
+      - radarr
+      - sonarr
+      - lidarr
+      - prowlarr
+      - seerr
       - overseerr
       - tautulli
       - sabnzbd
+      - seerr-reverse-proxy
+      - overseerr-reverse-proxy
+    # Services that don't need host volumes (reverse proxies use the parent service's volume for co-location)
+    proxy_services:
+      - seerr-reverse-proxy
+      - overseerr-reverse-proxy
     # Pack variables
     arr_enable_backup: true
     arr_enable_update: true
@@ -52,9 +78,41 @@
       ansible.builtin.assert:
         that:
           - arr_services | length > 0
-          - arr_services | difference(['radarr', 'sonarr', 'lidarr', 'prowlarr', 'overseerr', 'tautulli', 'sabnzbd']) | length == 0
-        fail_msg: "arr_services must contain valid service names: radarr, sonarr, lidarr, prowlarr, overseerr, tautulli, sabnzbd"
+          - arr_services | difference(valid_services) | length == 0
+        fail_msg: "arr_services must contain valid service names: {{ valid_services | join(', ') }}"
         success_msg: "Will deploy services: {{ arr_services | join(', ') }}"
+
+    - name: Check seerr and overseerr exclusivity
+      ansible.builtin.assert:
+        that:
+          - not ('seerr' in arr_services and 'overseerr' in arr_services)
+        fail_msg: "Cannot deploy both seerr and overseerr simultaneously. They use the same port (5055). Choose one or the other."
+        success_msg: "Request manager: {{ 'seerr' if 'seerr' in arr_services else ('overseerr' if 'overseerr' in arr_services else 'none') }}"
+
+    - name: Check reverse proxy exclusivity
+      ansible.builtin.assert:
+        that:
+          - not ('seerr-reverse-proxy' in arr_services and 'overseerr-reverse-proxy' in arr_services)
+        fail_msg: "Cannot deploy both seerr-reverse-proxy and overseerr-reverse-proxy simultaneously. They use the same ports (80/443). Choose one or the other."
+        success_msg: "Reverse proxy: {{ 'seerr-reverse-proxy' if 'seerr-reverse-proxy' in arr_services else ('overseerr-reverse-proxy' if 'overseerr-reverse-proxy' in arr_services else 'none') }}"
+
+    - name: Check reverse proxy matches request manager
+      ansible.builtin.assert:
+        that:
+          - not ('seerr-reverse-proxy' in arr_services and 'overseerr' in arr_services)
+          - not ('overseerr-reverse-proxy' in arr_services and 'seerr' in arr_services)
+        fail_msg: "Reverse proxy must match request manager. Use seerr-reverse-proxy with seerr, or overseerr-reverse-proxy with overseerr."
+        success_msg: "Reverse proxy configuration is valid"
+      when: "'seerr-reverse-proxy' in arr_services or 'overseerr-reverse-proxy' in arr_services"
+
+    - name: Check proxy_dns_name is set when deploying reverse proxy
+      ansible.builtin.assert:
+        that:
+          - proxy_dns_name is defined
+          - proxy_dns_name | length > 0
+        fail_msg: "proxy_dns_name must be set when deploying a reverse proxy (e.g., -e proxy_dns_name=requests.example.com)"
+        success_msg: "Reverse proxy DNS: {{ proxy_dns_name }}"
+      when: "'seerr-reverse-proxy' in arr_services or 'overseerr-reverse-proxy' in arr_services"
 
     # Check Nomad Pack is installed
     - name: Check if Nomad Pack is installed
@@ -96,7 +154,7 @@
       register: registry_add
       changed_when: "'added' in registry_add.stdout"
 
-    # Create host volumes for each service
+    # Create host volumes for each service (excluding reverse proxies which use parent service's volume)
     - name: Create host volumes for *arr services
       ansible.builtin.shell: |
         nomad volume create - <<'EOF'
@@ -115,7 +173,7 @@
         EOF
       environment:
         NOMAD_ADDR: "{{ nomad_addr }}"
-      loop: "{{ arr_services }}"
+      loop: "{{ arr_services | difference(proxy_services) }}"
       register: host_volumes
       changed_when: "'Created' in host_volumes.stdout"
       failed_when: false
@@ -126,6 +184,7 @@
       loop: "{{ host_volumes.results }}"
       loop_control:
         label: "{{ item.item }}"
+      when: host_volumes.results | length > 0
 
     #
     # RESTORE FROM BACKUP WORKFLOW
@@ -152,7 +211,7 @@
               {{ item }}
           environment:
             NOMAD_ADDR: "{{ nomad_addr }}"
-          loop: "{{ arr_services }}"
+          loop: "{{ arr_services | difference(proxy_services) }}"
           register: restore_deploys
           changed_when: "'deployed' in restore_deploys.stdout or 'Plan' in restore_deploys.stdout"
 
@@ -168,7 +227,7 @@
               {{ item }}-restore
           environment:
             NOMAD_ADDR: "{{ nomad_addr }}"
-          loop: "{{ arr_services }}"
+          loop: "{{ arr_services | difference(proxy_services) }}"
           register: dispatch_results
           changed_when: true
 
@@ -240,14 +299,27 @@
           --var enable_update={{ arr_enable_update | lower }}
           --var enable_restore=false
 
-    - name: Deploy *arr services with Nomad Pack
+    - name: Deploy *arr services with Nomad Pack (excluding proxies)
       ansible.builtin.command:
         cmd: nomad-pack run --registry={{ nomad_pack_registry_name }} {{ pack_vars }} {{ item }}
       environment:
         NOMAD_ADDR: "{{ nomad_addr }}"
-      loop: "{{ arr_services }}"
+      loop: "{{ arr_services | difference(proxy_services) }}"
       register: pack_results
       changed_when: "'deployed' in pack_results.stdout or 'Plan' in pack_results.stdout"
+
+    - name: Deploy reverse proxy with Nomad Pack
+      ansible.builtin.command:
+        cmd: >-
+          nomad-pack run --registry={{ nomad_pack_registry_name }}
+          --var dns_name={{ proxy_dns_name }}
+          {{ item }}
+      environment:
+        NOMAD_ADDR: "{{ nomad_addr }}"
+      loop: "{{ arr_services | intersect(proxy_services) }}"
+      register: proxy_results
+      changed_when: "'deployed' in proxy_results.stdout or 'Plan' in proxy_results.stdout"
+      when: arr_services | intersect(proxy_services) | length > 0
 
     - name: Display deployment results
       ansible.builtin.debug:
@@ -255,6 +327,14 @@
       loop: "{{ pack_results.results }}"
       loop_control:
         label: "{{ item.item }}"
+
+    - name: Display proxy deployment results
+      ansible.builtin.debug:
+        msg: "{{ item.item }}: {{ 'deployed' if item.rc == 0 else 'failed' }}"
+      loop: "{{ proxy_results.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: proxy_results.results is defined and proxy_results.results | length > 0
 
     # Verify all jobs are running
     - name: Wait for services to start
@@ -290,8 +370,17 @@
           {% if 'prowlarr' in arr_services %}
             - Prowlarr:  http://192.168.0.10:9696
           {% endif %}
+          {% if 'seerr' in arr_services %}
+            - Seerr:     http://192.168.0.10:5055
+          {% endif %}
+          {% if 'seerr-reverse-proxy' in arr_services %}
+            - Seerr (HTTPS): https://{{ proxy_dns_name }}
+          {% endif %}
           {% if 'overseerr' in arr_services %}
             - Overseerr: http://192.168.0.10:5055
+          {% endif %}
+          {% if 'overseerr-reverse-proxy' in arr_services %}
+            - Overseerr (HTTPS): https://{{ proxy_dns_name }}
           {% endif %}
           {% if 'tautulli' in arr_services %}
             - Tautulli:  http://192.168.0.10:8181
@@ -304,5 +393,5 @@
             1. Configure Prowlarr with your indexers
             2. Add Prowlarr to Radarr/Sonarr/Lidarr (Settings → Indexers)
             3. Configure download clients in each *arr app
-            4. Connect Overseerr to Plex and Radarr/Sonarr
+            4. Connect {{ 'Seerr' if 'seerr' in arr_services else 'Overseerr' }} to your media server and Radarr/Sonarr
             5. Connect Tautulli to Plex

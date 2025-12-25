@@ -11,7 +11,7 @@ This repository provides automated deployment of:
 - **CIFS/SMB CSI Plugin** - Network storage for media libraries via SMB/CIFS shares
 - **Dynamic Host Volumes** - Nomad-managed local storage using the `mkdir` plugin (Nomad 1.10+)
 - **Media Server** - Plex or Jellyfin deployed via Nomad Pack
-- **Media Automation** - Radarr, Sonarr, Lidarr, Prowlarr, Overseerr, Tautulli
+- **Media Automation** - Radarr, Sonarr, Lidarr, Prowlarr, Seerr (or Overseerr), Tautulli
 
 ## Architecture
 
@@ -90,7 +90,7 @@ Configure your NAS with SMB/CIFS shares:
    | Sonarr | http://192.168.0.10:8989 |
    | Lidarr | http://192.168.0.10:8686 |
    | Prowlarr | http://192.168.0.10:9696 |
-   | Overseerr | http://192.168.0.10:5055 |
+   | Seerr | http://192.168.0.10:5055 (or https via reverse proxy) |
    | Tautulli | http://192.168.0.10:8181 |
    | SABnzbd | http://192.168.0.10:8080 |
 
@@ -143,7 +143,9 @@ ansible-playbook -i inventory.ini playbooks/deploy-arr-stack.yml \
   -e arr_enable_backup=false
 ```
 
-**Available services:** `radarr`, `sonarr`, `lidarr`, `prowlarr`, `overseerr`, `tautulli`
+**Available services:** `radarr`, `sonarr`, `lidarr`, `prowlarr`, `seerr`, `tautulli`, `sabnzbd`
+
+**Note:** Seerr is the default request manager. To use Overseerr instead, explicitly include `overseerr` in the services list. Seerr and Overseerr cannot be deployed simultaneously (they use the same port). Optional reverse proxies (`seerr-reverse-proxy`, `overseerr-reverse-proxy`) require the `proxy_dns_name` variable.
 
 ### Restoring from Backup
 
@@ -262,6 +264,7 @@ When jobs request host volumes, Nomad creates them on-demand with the specified 
 | `sonarr-config` | Sonarr configuration and database | `deploy-arr-stack.yml` |
 | `lidarr-config` | Lidarr configuration and database | `deploy-arr-stack.yml` |
 | `prowlarr-config` | Prowlarr configuration and database | `deploy-arr-stack.yml` |
+| `seerr-config` | Seerr configuration and database | `deploy-arr-stack.yml` |
 | `overseerr-config` | Overseerr configuration and database | `deploy-arr-stack.yml` |
 | `tautulli-config` | Tautulli configuration and database | `deploy-arr-stack.yml` |
 | `sabnzbd-config` | SABnzbd configuration and database | `deploy-arr-stack.yml` |
@@ -292,9 +295,12 @@ Each *arr service creates multiple jobs:
 | Sonarr | `sonarr` | `sonarr-backup` | `sonarr-update` |
 | Lidarr | `lidarr` | `lidarr-backup` | `lidarr-update` |
 | Prowlarr | `prowlarr` | `prowlarr-backup` | `prowlarr-update` |
+| Seerr | `seerr` | `seerr-backup` | `seerr-update` |
 | Overseerr | `overseerr` | `overseerr-backup` | `overseerr-update` |
 | Tautulli | `tautulli` | `tautulli-backup` | `tautulli-update` |
 | SABnzbd | `sabnzbd` | `sabnzbd-backup` | `sabnzbd-update` |
+
+Optional reverse proxy jobs: `seerr-reverse-proxy`, `overseerr-reverse-proxy`
 
 Restore jobs (`radarr-restore`, `sonarr-restore`, etc.) are created during the restore workflow and removed after completion.
 
@@ -307,7 +313,7 @@ After deploying the *arr stack, configure the services to work together:
 1. **SABnzbd** - Configure download client first
 2. **Prowlarr** - Configure indexers
 3. **Radarr/Sonarr/Lidarr** - Add Prowlarr as indexer source, SABnzbd as download client
-4. **Overseerr** - Connect to Plex and Radarr/Sonarr
+4. **Seerr** - Connect to Plex/Jellyfin/Emby and Radarr/Sonarr
 5. **Tautulli** - Connect to Plex
 
 ### Service Connections
@@ -318,7 +324,7 @@ After deploying the *arr stack, configure the services to work together:
 | Radarr | Prowlarr, Download Client | Settings → Indexers, Settings → Download Clients |
 | Sonarr | Prowlarr, Download Client | Settings → Indexers, Settings → Download Clients |
 | Lidarr | Prowlarr, Download Client | Settings → Indexers, Settings → Download Clients |
-| Overseerr | Plex, Radarr, Sonarr | Settings → Plex, Settings → Radarr/Sonarr |
+| Seerr | Plex/Jellyfin/Emby, Radarr, Sonarr | Settings → Media Server, Settings → Services |
 | Tautulli | Plex | Settings → Plex Media Server |
 
 ### Media Path Configuration
